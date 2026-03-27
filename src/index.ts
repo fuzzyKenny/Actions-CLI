@@ -9,17 +9,29 @@ import {
   parseActionRef,
   parseTaskId,
   readStore,
-  writeStore
+  writeStore,
 } from "./data.js";
-import { formatAction, formatTask, pluralize } from "./format.js";
+import { formatTask, pluralize } from "./format.js";
 import { generateActions } from "./generate.js";
+
+type ParsedActionRef = {
+  raw: string;
+  taskId: number;
+  actionId: number;
+};
+
+type ActionRefResult = ParsedActionRef & {
+  text: string;
+};
+
+type RefError = {
+  raw: string;
+  reason: string;
+};
 
 const program = new Command();
 
-program
-  .name("act")
-  .description("Actions over todos CLI")
-  .version("0.1.0");
+program.name("act").description("Actions over todos CLI").version("0.1.0");
 
 program
   .command("add")
@@ -36,7 +48,7 @@ program
 
     store.tasks.push({
       title: trimmedTitle,
-      actions: []
+      actions: [],
     });
 
     writeStore(store);
@@ -60,14 +72,21 @@ program
     }
 
     if (task.actions.length > 0) {
-      exitWithError(`Task ${taskId} already has actions. Use \`act action add ${taskId} "..." \` or remove them first.`);
+      exitWithError(
+        `Task ${taskId} already has actions. Use \`act action add ${taskId} "..." \` or remove them first.`,
+      );
     }
 
     const spinner = ora(`Breaking task ${taskId} into actions`).start();
-    const actions = generateActions(task.title).map((text) => ({ text, done: false }));
+    const actions = generateActions(task.title).map((text) => ({
+      text,
+      done: false,
+    }));
     task.actions = actions;
     writeStore(store);
-    spinner.succeed(`Created ${pluralize(actions.length, "action")} for task ${taskId}`);
+    spinner.succeed(
+      `Created ${pluralize(actions.length, "action")} for task ${taskId}`,
+    );
 
     for (const [index, action] of actions.entries()) {
       console.log(`${chalk.cyan(`${index + 1}.`)} ${action.text}`);
@@ -81,7 +100,9 @@ program
     const store = readStore();
 
     if (store.tasks.length === 0) {
-      console.log(chalk.yellow("No tasks yet. Add one with `act add \"your task\"`."));
+      console.log(
+        chalk.yellow('No tasks yet. Add one with `act add "your task"`.'),
+      );
       return;
     }
 
@@ -115,28 +136,56 @@ program
 
 program
   .command("done")
-  .description("Mark an action as done")
-  .argument("<task.action>", "action reference, for example 1.2")
-  .action((value: string) => {
-    const { taskId, actionId } = parseActionRef(value);
+  .description("Mark one or more actions as done")
+  .argument("<refs...>", "action references, for example 1.2 1.4 2.5")
+  .action((values: string[]) => {
+    const { validRefs, invalidRefs } = parseActionRefs(values);
     const store = readStore();
-    const task = getTask(store, taskId);
+    const { toMark, alreadyDone, notFound } = resolveActionRefs(
+      store,
+      validRefs,
+    );
+    const failures = [...invalidRefs, ...notFound];
 
-    if (!task) {
-      exitWithError(`Task ${taskId} was not found.`);
+    for (const item of toMark) {
+      const task = getTask(store, item.taskId);
+
+      if (!task) {
+        continue;
+      }
+
+      task.actions[item.actionId - 1].done = true;
     }
 
-    const action = task.actions[actionId - 1];
-
-    if (!action) {
-      exitWithError(`Action ${taskId}.${actionId} was not found.`);
+    if (toMark.length > 0) {
+      writeStore(store);
     }
 
-    action.done = true;
-    writeStore(store);
+    if (toMark.length > 0) {
+      printActionRefSection(
+        chalk.green(`Marked ${pluralize(toMark.length, "action")} as done.`),
+        toMark,
+      );
+    }
 
-    console.log(chalk.green(`Marked ${taskId}.${actionId} as done.`));
-    console.log(chalk.dim(action.text));
+    if (alreadyDone.length > 0) {
+      printActionRefSection(
+        chalk.yellow(
+          `Skipped ${pluralize(alreadyDone.length, "action")} already marked as done.`,
+        ),
+        alreadyDone,
+        toMark.length > 0,
+      );
+    }
+
+    if (failures.length > 0) {
+      printFailureSection(
+        chalk.red(`Could not mark ${pluralize(failures.length, "reference")}.`),
+        failures,
+        toMark.length > 0 || alreadyDone.length > 0,
+      );
+      process.exitCode = 1;
+    }
   });
 
 const actionCommand = program.command("action").description("Manage actions");
@@ -215,12 +264,14 @@ program
       task.actions.flatMap((action, actionIndex) =>
         action.done
           ? []
-          : [{
-          label: `→ ${action.text}`,
-          ref: `${taskIndex + 1}.${actionIndex + 1}`,
-          task: task.title
-            }]
-      )
+          : [
+              {
+                label: `→ ${action.text}`,
+                ref: `${taskIndex + 1}.${actionIndex + 1}`,
+                task: task.title,
+              },
+            ],
+      ),
     );
 
     if (pending.length === 0) {
@@ -240,12 +291,18 @@ program
   .action(() => {
     const store = readStore();
     const totalTasks = store.tasks.length;
-    const totalActions = store.tasks.reduce((sum, task) => sum + task.actions.length, 0);
+    const totalActions = store.tasks.reduce(
+      (sum, task) => sum + task.actions.length,
+      0,
+    );
     const completedActions = store.tasks.reduce(
       (sum, task) => sum + task.actions.filter((action) => action.done).length,
-      0
+      0,
     );
-    const progress = totalActions === 0 ? 0 : Math.round((completedActions / totalActions) * 100);
+    const progress =
+      totalActions === 0
+        ? 0
+        : Math.round((completedActions / totalActions) * 100);
 
     console.log(`Tasks: ${totalTasks}`);
     console.log(`Completed: ${completedActions}/${totalActions}`);
@@ -263,4 +320,122 @@ program.parseAsync(process.argv).catch((error: unknown) => {
 function exitWithError(message: string): never {
   console.error(chalk.red(message));
   process.exit(1);
+}
+
+function parseActionRefs(values: string[]): {
+  validRefs: ParsedActionRef[];
+  invalidRefs: RefError[];
+} {
+  const seenRaw = new Set<string>();
+  const seenNormalized = new Set<string>();
+  const validRefs: ParsedActionRef[] = [];
+  const invalidRefs: RefError[] = [];
+
+  for (const raw of values) {
+    if (seenRaw.has(raw)) {
+      continue;
+    }
+
+    seenRaw.add(raw);
+
+    try {
+      const { taskId, actionId } = parseActionRef(raw);
+      const normalized = `${taskId}.${actionId}`;
+
+      if (seenNormalized.has(normalized)) {
+        continue;
+      }
+
+      seenNormalized.add(normalized);
+      validRefs.push({ raw, taskId, actionId });
+    } catch (error: unknown) {
+      invalidRefs.push({
+        raw,
+        reason: error instanceof Error ? error.message : "Invalid reference.",
+      });
+    }
+  }
+
+  return { validRefs, invalidRefs };
+}
+
+function resolveActionRefs(
+  store: ReturnType<typeof readStore>,
+  refs: ParsedActionRef[],
+): {
+  toMark: ActionRefResult[];
+  alreadyDone: ActionRefResult[];
+  notFound: RefError[];
+} {
+  const toMark: ActionRefResult[] = [];
+  const alreadyDone: ActionRefResult[] = [];
+  const notFound: RefError[] = [];
+
+  for (const ref of refs) {
+    const task = getTask(store, ref.taskId);
+
+    if (!task) {
+      notFound.push({
+        raw: ref.raw,
+        reason: `Action ${ref.taskId}.${ref.actionId} was not found.`,
+      });
+      continue;
+    }
+
+    const action = task.actions[ref.actionId - 1];
+
+    if (!action) {
+      notFound.push({
+        raw: ref.raw,
+        reason: `Action ${ref.taskId}.${ref.actionId} was not found.`,
+      });
+      continue;
+    }
+
+    const resolved = {
+      ...ref,
+      text: action.text,
+    };
+
+    if (action.done) {
+      alreadyDone.push(resolved);
+      continue;
+    }
+
+    toMark.push(resolved);
+  }
+
+  return { toMark, alreadyDone, notFound };
+}
+
+function printActionRefSection(
+  heading: string,
+  items: ActionRefResult[],
+  addLeadingSpace = false,
+): void {
+  if (addLeadingSpace) {
+    console.log("");
+  }
+
+  console.log(heading);
+
+  for (const item of items) {
+    console.log(`  ${item.taskId}.${item.actionId} ${item.text}`);
+  }
+}
+
+function printFailureSection(
+  heading: string,
+  items: RefError[],
+  addLeadingSpace = false,
+): void {
+  if (addLeadingSpace) {
+    console.log("");
+  }
+
+  console.log(heading);
+
+  for (const item of items) {
+    console.log(`  ${item.raw} ${item.reason}`);
+  }
 }
