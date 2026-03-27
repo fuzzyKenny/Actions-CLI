@@ -36,7 +36,7 @@ The goal is simple: always know what to do next.
 
 ## Installation
 
-### Install with the script
+### Install with the script on macOS or Linux
 
 ```bash
 git clone https://github.com/fuzzyKenny/Actions-CLI.git
@@ -65,6 +65,35 @@ Then verify the install:
 act --help
 ```
 
+### Install with the script on Windows
+
+Open PowerShell and run:
+
+```powershell
+git clone https://github.com/fuzzyKenny/Actions-CLI.git
+cd Actions-CLI
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+The Windows installer:
+
+- uses the existing `dist/` build when available
+- builds from source when `dist/` is missing
+- installs the CLI into `%LOCALAPPDATA%\act-cli`
+- creates `act.cmd` and `act.ps1` launchers in `%LOCALAPPDATA%\act-cli\bin`
+
+If `%LOCALAPPDATA%\act-cli\bin` is not already in your user `PATH`, add it:
+
+```powershell
+[Environment]::SetEnvironmentVariable("Path", "$env:LOCALAPPDATA\act-cli\bin;" + [Environment]::GetEnvironmentVariable("Path", "User"), "User")
+```
+
+Then restart PowerShell and verify the install:
+
+```powershell
+act --help
+```
+
 ### Install manually from source
 
 ```bash
@@ -74,6 +103,8 @@ npm install
 npm run build
 npm link
 ```
+
+On Windows, run the same steps in PowerShell.
 
 ## Usage
 
