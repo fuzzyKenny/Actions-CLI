@@ -34,34 +34,57 @@ The goal is simple: always know what to do next.
 
 ## Installation
 
-### Install from source
+### Install with the script
 
 ```bash
-git clone https://github.com/yourusername/act-cli
-cd act-cli
-npm install
-npm run build
+git clone https://github.com/fuzzyKenny/Actions-CLI.git
+cd Actions-CLI
+chmod +x install.sh
+./install.sh
 ```
 
-### Use as a global CLI during development
+The installer:
+
+- uses the existing `dist/` build when available
+- builds from source when `dist/` is missing
+- installs the CLI into `~/.local/share/act-cli`
+- creates the `act` launcher in `~/.local/bin`
+
+If `~/.local/bin` is not already in your `PATH`, add it:
 
 ```bash
-npm link
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
 ```
 
-After that, you can run:
+Then verify the install:
 
 ```bash
 act --help
 ```
 
-### Run without linking
+### Install manually from source
 
 ```bash
-node dist/index.js --help
+git clone https://github.com/fuzzyKenny/Actions-CLI.git
+cd Actions-CLI
+npm install
+npm run build
+npm link
 ```
 
 ## Usage
+
+### Quick start
+
+```bash
+act add "study dbms"
+act break 1
+act list
+act next
+```
+
+This creates a task, generates a few small actions, lists them, and shows the next thing to do.
 
 ### Add a task
 
@@ -125,6 +148,12 @@ act done 1.2
 
 `1.2` means task `1`, action `2`.
 
+You can also mark multiple actions at once:
+
+```bash
+act done 1.1 1.2 2.1
+```
+
 ### Add your own action
 
 ```bash
@@ -165,6 +194,13 @@ Example output:
 Tasks: 1
 Completed: 1/3
 Progress: 33%
+```
+
+### See all commands
+
+```bash
+act --help
+act action --help
 ```
 
 ## Where Data Is Stored
