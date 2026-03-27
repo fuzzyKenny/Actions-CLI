@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type CSSProperties, useState } from "react";
 import { Check, ChevronRight, Copy } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import heroImageDark from "./assets/act-cli(white).svg";
@@ -7,6 +7,50 @@ import heroImageLight from "./assets/act-cli.svg";
 function App() {
   const prefersReducedMotion = useReducedMotion();
   const [copied, setCopied] = useState<string | null>(null);
+  const pageBackgroundStyle: CSSProperties = {
+    backgroundImage: `
+      linear-gradient(to right, #a8a29e 1px, transparent 1px),
+      linear-gradient(to bottom, #a8a29e 1px, transparent 1px)
+    `,
+    backgroundSize: "20px 20px",
+    backgroundPosition: "0 0, 0 0",
+    maskImage: `
+      repeating-linear-gradient(
+        to right,
+        black 0px,
+        black 3px,
+        transparent 3px,
+        transparent 8px
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        black 0px,
+        black 3px,
+        transparent 3px,
+        transparent 8px
+      ),
+      radial-gradient(ellipse 80% 80% at 0% 0%, #000 50%, transparent 90%)
+    `,
+    WebkitMaskImage: `
+      repeating-linear-gradient(
+        to right,
+        black 0px,
+        black 3px,
+        transparent 3px,
+        transparent 8px
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        black 0px,
+        black 3px,
+        transparent 3px,
+        transparent 8px
+      ),
+      radial-gradient(ellipse 80% 80% at 0% 0%, #000 50%, transparent 90%)
+    `,
+    maskComposite: "intersect",
+    WebkitMaskComposite: "source-in",
+  };
 
   const reveal = (delay = 0) =>
     prefersReducedMotion
@@ -50,8 +94,13 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <main className="mx-auto w-[min(1200px,calc(100vw-2rem))] px-0 pt-8 pb-20 max-sm:w-[min(100vw-1rem,100%)]">
+    <div className="relative min-h-screen w-full bg-background text-foreground">
+      <div
+        className="pointer-events-none absolute inset-0 z-0 opacity-30"
+        style={pageBackgroundStyle}
+        aria-hidden="true"
+      />
+      <main className="relative z-10 mx-auto w-[min(1200px,calc(100vw-2rem))] px-0 pt-8 pb-20 max-sm:w-[min(100vw-1rem,100%)]">
         <section
           className="block pt-[2.2rem] pb-8 max-sm:pt-[1.6rem]"
           id="hero"
