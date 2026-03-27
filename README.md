@@ -4,6 +4,8 @@
 
 Act is a simple CLI that turns vague tasks into small actions you can start right away.
 
+This repository contains the CLI only. The frontend website lives in a separate web repository.
+
 Instead of writing:
 
 - `study dbms`
