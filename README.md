@@ -138,6 +138,7 @@ act break 1
 ```
 
 By default, `act break` tries to use your local `opencode` installation and its existing provider/model setup.
+If you set a preferred model with `act model switch`, Act uses that model by default for future `break` runs.
 If `opencode` is unavailable or returns unusable output, Act automatically falls back to built-in rules.
 
 Act supports macOS, Linux, and Windows.
@@ -258,6 +259,15 @@ Override the model for one run:
 ```bash
 act break 1 --model openai/gpt-5.4-mini
 ```
+
+Choose a preferred model interactively:
+
+```bash
+act model switch
+```
+
+This opens an arrow-key picker backed by `opencode models`.
+Press `Enter` to save the selected model, or choose `Use opencode default` to clear Act's saved preference.
 
 ## Where Data Is Stored
 
