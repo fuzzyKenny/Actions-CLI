@@ -22,7 +22,7 @@ The goal is simple: always know what to do next.
 ## Features
 
 - Add tasks from the terminal
-- Break a task into actionable steps
+- Break a task into actionable steps with local `opencode`
 - Mark actions as done
 - See the next action to work on
 - Focus only on unfinished work
@@ -137,6 +137,14 @@ Added task 1: study dbms
 act break 1
 ```
 
+By default, `act break` tries to use your local `opencode` installation and its existing provider/model setup.
+If `opencode` is unavailable or returns unusable output, Act automatically falls back to built-in rules.
+
+Act supports macOS, Linux, and Windows.
+On Windows, native `opencode` installs are supported, but WSL is recommended for the best OpenCode experience.
+If you run Act inside WSL, install `opencode` inside WSL too.
+If you run Act from PowerShell or Command Prompt, install `opencode` in that native Windows environment.
+
 Example output:
 
 ```text
@@ -234,6 +242,21 @@ Progress: 33%
 ```bash
 act --help
 act action --help
+act help break
+```
+
+### Break options
+
+Force the built-in generator:
+
+```bash
+act break 1 --heuristic
+```
+
+Override the model for one run:
+
+```bash
+act break 1 --model openai/gpt-5.4-mini
 ```
 
 ## Where Data Is Stored
@@ -272,7 +295,9 @@ Example:
 
 This is a basic `v1`.
 
-The `break` command currently uses simple built-in rules to generate actions. It does not use AI yet.
+The `break` command sends only the current task title to local `opencode` when AI generation is used.
+
+`opencode` is optional. If it is missing, times out, or returns invalid output, Act falls back to simple built-in rules.
 
 ## Roadmap
 
