@@ -1,4 +1,4 @@
-export function generateActions(title: string): string[] {
+export function generateHeuristicActions(title: string): string[] {
   const normalized = title.trim().toLowerCase();
   const subject = cleanedSubject(normalized);
 

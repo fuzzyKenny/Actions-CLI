@@ -12,7 +12,8 @@ import {
   writeStore,
 } from "./data.js";
 import { formatTask, pluralize } from "./format.js";
-import { generateActions } from "./generate.js";
+import { generateHeuristicActions } from "./generate.js";
+import { generateBreakActions } from "./opencode.js";
 
 type ParsedActionRef = {
   raw: string;
@@ -62,7 +63,9 @@ program
   .command("break")
   .description("Generate actions for a task")
   .argument("<taskId>", "task number")
-  .action((value: string) => {
+  .option("--heuristic", "use built-in rules instead of opencode")
+  .option("--model <provider/model>", "override the opencode model for this run")
+  .action(async (value: string, options: { heuristic?: boolean; model?: string }) => {
     const taskId = parseTaskId(value);
     const store = readStore();
     const task = getTask(store, taskId);
@@ -78,14 +81,30 @@ program
     }
 
     const spinner = ora(`Breaking task ${taskId} into actions`).start();
-    const actions = generateActions(task.title).map((text) => ({
+    const result = options.heuristic
+      ? { actions: generateHeuristicActions(task.title), source: "heuristic" as const }
+      : await generateBreakActions({
+          taskTitle: task.title,
+          cwd: process.cwd(),
+          model: options.model,
+        });
+
+    if (result.warning) {
+      spinner.stop();
+      console.log(chalk.yellow(`Warning: ${result.warning}`));
+      spinner.start(`Breaking task ${taskId} into actions`);
+    }
+
+    const actions = result.actions.map((text) => ({
       text,
       done: false,
     }));
     task.actions = actions;
     writeStore(store);
     spinner.succeed(
-      `Created ${pluralize(actions.length, "action")} for task ${taskId}`,
+      `Created ${pluralize(actions.length, "action")} for task ${taskId} with ${
+        result.source === "opencode" ? "opencode" : "built-in rules"
+      }`,
     );
 
     for (const [index, action] of actions.entries()) {
