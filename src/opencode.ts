@@ -76,7 +76,15 @@ export async function generateBreakActions(
 export async function generateActionsWithOpencode(
   options: GenerateBreakOptions,
 ): Promise<string[]> {
-  const stdout = await runOpencode(options);
+  const stdout = await runOpencodeCommand(options, [
+    "run",
+    "--format",
+    "json",
+    "--dir",
+    options.cwd,
+    ...(options.model ? ["--model", options.model] : []),
+    buildBreakPrompt(options.taskTitle),
+  ]);
   const responseText = collectOpencodeText(stdout);
 
   if (!responseText) {
@@ -262,7 +270,34 @@ export function getMissingOpencodeWarning(platform: NodeJS.Platform): string {
   return "opencode was not found. Falling back to built-in rules.";
 }
 
+export async function listOpencodeModels(
+  options: Pick<GenerateBreakOptions, "cwd" | "opencodeBin" | "platform" | "commandLookup">,
+): Promise<string[]> {
+  const stdout = await runOpencodeCommand(
+    {
+      cwd: options.cwd,
+      opencodeBin: options.opencodeBin,
+      platform: options.platform,
+      commandLookup: options.commandLookup,
+      taskTitle: "",
+    },
+    ["models"],
+  );
+
+  return stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
 async function runOpencode(options: GenerateBreakOptions): Promise<string> {
+  return runOpencodeCommand(options, []);
+}
+
+async function runOpencodeCommand(
+  options: GenerateBreakOptions,
+  opencodeArgs: string[],
+): Promise<string> {
   const availability = await checkOpencodeAvailability(options);
 
   if (availability.status === "missing") {
@@ -271,13 +306,6 @@ async function runOpencode(options: GenerateBreakOptions): Promise<string> {
 
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const platform = options.platform ?? process.platform;
-  const opencodeArgs = ["run", "--format", "json", "--dir", options.cwd];
-
-  if (options.model) {
-    opencodeArgs.push("--model", options.model);
-  }
-
-  opencodeArgs.push(buildBreakPrompt(options.taskTitle));
   const launchSpec = buildOpencodeLaunchSpec({
     resolvedCommand: availability.resolvedCommand,
     opencodeArgs,

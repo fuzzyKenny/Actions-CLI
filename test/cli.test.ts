@@ -82,6 +82,30 @@ test("break forwards --model to opencode", async () => {
   assert.equal(argv[6], "openai/gpt-5.4-mini");
 });
 
+test("break uses the saved preferred model when no --model flag is passed", async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "act-cli-test-"));
+  const argsFile = path.join(tempDir, "args.json");
+  const opencodeBin = await createFakeOpencode(tempDir, [
+    `await fs.writeFile(${JSON.stringify(argsFile)}, JSON.stringify(process.argv.slice(2)), 'utf8');`,
+    "process.stdout.write(JSON.stringify({ type: 'text', part: { text: JSON.stringify({ actions: ['Choose the first file to change', 'Implement one small working slice', 'Run one check for the slice'] }) } }) + '\\n');",
+  ]);
+
+  await fs.mkdir(path.join(tempDir, ".act"), { recursive: true });
+  await fs.writeFile(
+    path.join(tempDir, ".act", "config.json"),
+    `${JSON.stringify({ model: "openai/gpt-5.4" }, null, 2)}\n`,
+    "utf8",
+  );
+
+  await runAct(["add", "build login route"], tempDir, { ACT_OPENCODE_BIN: opencodeBin });
+  const result = await runAct(["break", "1"], tempDir, { ACT_OPENCODE_BIN: opencodeBin });
+
+  assert.equal(result.code, 0);
+
+  const argv = JSON.parse(await fs.readFile(argsFile, "utf8")) as string[];
+  assert.equal(argv[6], "openai/gpt-5.4");
+});
+
 test("break falls back to heuristic when opencode is missing", async () => {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "act-cli-test-"));
 
@@ -170,6 +194,22 @@ test("break still refuses tasks that already have actions before invoking openco
   assert.equal(result.code, 1);
   assert.match(result.stderr, /already has actions/);
   assert.doesNotMatch(result.stderr, /opencode failed/);
+});
+
+test("model command shows the saved preferred model", async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "act-cli-test-"));
+
+  await fs.mkdir(path.join(tempDir, ".act"), { recursive: true });
+  await fs.writeFile(
+    path.join(tempDir, ".act", "config.json"),
+    `${JSON.stringify({ model: "openai/gpt-5.4-mini" }, null, 2)}\n`,
+    "utf8",
+  );
+
+  const result = await runAct(["model"], tempDir);
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /Preferred model: openai\/gpt-5\.4-mini/);
 });
 
 async function createFakeOpencode(tempDir: string, statements: string[]): Promise<string> {

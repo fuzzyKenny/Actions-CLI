@@ -3,6 +3,7 @@
 import chalk from "chalk";
 import { Command } from "commander";
 import ora from "ora";
+import { getConfigPath, readConfig } from "./config.js";
 import {
   getStorePath,
   getTask,
@@ -14,6 +15,7 @@ import {
 import { formatTask, pluralize } from "./format.js";
 import { generateHeuristicActions } from "./generate.js";
 import { generateBreakActions } from "./opencode.js";
+import { switchPreferredModel } from "./model.js";
 
 type ParsedActionRef = {
   raw: string;
@@ -68,6 +70,7 @@ program
   .action(async (value: string, options: { heuristic?: boolean; model?: string }) => {
     const taskId = parseTaskId(value);
     const store = readStore();
+    const config = readConfig();
     const task = getTask(store, taskId);
 
     if (!task) {
@@ -86,7 +89,7 @@ program
       : await generateBreakActions({
           taskTitle: task.title,
           cwd: process.cwd(),
-          model: options.model,
+          model: options.model ?? config.model,
         });
 
     if (result.warning) {
@@ -109,6 +112,44 @@ program
 
     for (const [index, action] of actions.entries()) {
       console.log(`${chalk.cyan(`${index + 1}.`)} ${action.text}`);
+    }
+  });
+
+const modelCommand = program.command("model").description("Manage preferred opencode model");
+
+modelCommand.action(() => {
+  const config = readConfig();
+
+  if (config.model) {
+    console.log(chalk.green(`Preferred model: ${config.model}`));
+  } else {
+    console.log(chalk.dim("Preferred model: using opencode default"));
+  }
+
+  console.log(chalk.dim(`Stored in ${getConfigPath()}`));
+});
+
+modelCommand
+  .command("switch")
+  .description("Choose a preferred model with arrow keys")
+  .action(async () => {
+    const spinner = ora("Loading available opencode models").start();
+
+    try {
+      const result = await switchPreferredModel();
+      spinner.stop();
+
+      if (result.cleared) {
+        console.log(chalk.green("Using opencode default model"));
+      } else {
+        console.log(chalk.green(`Preferred model set to ${result.model}`));
+      }
+
+      console.log(chalk.dim(`Stored in ${getConfigPath()}`));
+      console.log(chalk.dim(`Loaded ${pluralize(result.count, "model")}`));
+    } catch (error: unknown) {
+      spinner.stop();
+      exitWithError(error instanceof Error ? error.message : "Could not switch models.");
     }
   });
 

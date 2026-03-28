@@ -10,6 +10,7 @@ import {
   collectOpencodeText,
   generateBreakActions,
   getMissingOpencodeWarning,
+  listOpencodeModels,
   parseBreakResponse,
   resolveOpencodeCommand,
   validateActions,
@@ -182,6 +183,20 @@ test("generateBreakActions falls back on timeout", async () => {
   assert.equal(result.source, "heuristic");
   assert.match(result.warning ?? "", /timed out/);
   assert.equal(result.actions[0], "Read 10 pages of dbms notes");
+});
+
+test("listOpencodeModels returns trimmed model lines", async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "act-opencode-test-"));
+  const opencodeBin = await createFakeOpencode(tempDir, [
+    "process.stdout.write('openai/gpt-5.4\\nopenai/gpt-5.4-mini\\n');",
+  ]);
+
+  const models = await listOpencodeModels({
+    cwd: tempDir,
+    opencodeBin,
+  });
+
+  assert.deepEqual(models, ["openai/gpt-5.4", "openai/gpt-5.4-mini"]);
 });
 
 async function createFakeOpencode(tempDir: string, statements: string[]): Promise<string> {
