@@ -33,6 +33,7 @@ The goal is simple: always know what to do next.
 
 - Node.js 18+
 - npm
+- `opencode` for AI-powered `break` and `model switch` commands
 
 ## Installation
 
